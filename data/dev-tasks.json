@@ -1,0 +1,10 @@
+{
+  "tasks": [
+    {
+      "id": "task-hello",
+      "description": "创建 hello.txt 文件，内容为 'Hello from Worker 1'",
+      "status": "pending",
+      "created_at": "2026-02-23T00:00:00Z"
+    }
+  ]
+}
