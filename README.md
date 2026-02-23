@@ -66,14 +66,20 @@ claude-code-selftask/
 │   ├─ static/            # 前端 PWA
 │   └─ venv/              # Python 虚拟环境
 │
+├─ worktrees/              # Git Worktree 工作区（gitignored）
+│   └─ worktree-worker-*/  # 各 Worker 的独立工作目录
+│
+├─ tests/                  # 测试脚本与报告
+│   ├─ test_multi_worker.py
+│   └─ quick_test.sh
+│
 ├─ data/                   # 运行时数据
 │   ├─ dev-tasks.json     # 任务队列
 │   └─ .env               # 环境变量（不提交）
 │
 ├─ docs/                   # 文档
-│   └─ research/          # 调研报告
 │
-├─ .claude/                # Claude Code 配置（如需要）
+├─ .claude/                # Claude Code 配置
 │
 ├─ CLAUDE.md              # 项目级"干活"逻辑
 ├─ PROGRESS.md            # AI 经验记录

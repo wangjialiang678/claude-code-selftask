@@ -13,8 +13,8 @@ data/.env
 *.log
 cloudflared.log
 
-# Worktree 目录（由 Claude Code 管理）
-.worktrees/
+# Worktree 目录（由 Worker Manager 创建）
+worktrees/
 
 # IDE
 .vscode/
