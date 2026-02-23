@@ -51,6 +51,28 @@
 
 ---
 
+## 任务: task-20260223-143834-320e61cc - 整理 worktree-worker 目录结构
+
+**完成时间:** 2026-02-23
+**Worker ID:** worker-test
+
+**工作内容:**
+- 检查 worktree-worker 目录位置（已在正确位置 `worktrees/` 下）
+- 修复 `.gitignore`：`.worktrees/` → `worktrees/`（名称不匹配实际目录）
+- 更新 `README.md` 项目结构，补充 `worktrees/` 和 `tests/` 目录
+- 确认 `worker_manager.py` 路径配置正确，无需修改
+
+**经验教训:**
+- `.gitignore` 中的路径必须和实际目录名完全一致
+- worktree 目录结构变更后需同步更新项目文档
+
+**修改的文件:**
+- .gitignore
+- README.md
+- PROGRESS.md
+
+---
+
 ## 待办事项
 
 - [ ] 测试第一个 Worker 运行
