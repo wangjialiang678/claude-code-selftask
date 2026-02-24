@@ -29,3 +29,6 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.bak
+
+# Claude feedback logs (may contain secrets)
+.claude/memory-bank/feedback/

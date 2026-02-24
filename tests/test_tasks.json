@@ -1,0 +1,62 @@
+{
+  "description": "测试任务集 - 从简单到复杂",
+  "tasks": {
+    "level1_simple": [
+      {
+        "id": "test-create-file",
+        "description": "创建文件 test-output.txt，内容为 'Test successful'",
+        "status": "pending",
+        "expected_files": ["test-output.txt"],
+        "validation": "cat test-output.txt | grep 'Test successful'"
+      },
+      {
+        "id": "test-hello-world",
+        "description": "创建 hello.py 文件，打印 'Hello World'",
+        "status": "pending",
+        "expected_files": ["hello.py"],
+        "validation": "python hello.py | grep 'Hello World'"
+      }
+    ],
+    "level2_git_ops": [
+      {
+        "id": "test-modify-readme",
+        "description": "在 README.md 末尾添加一行 '## Test Section'",
+        "status": "pending",
+        "expected_files": ["README.md"],
+        "validation": "grep '## Test Section' README.md"
+      },
+      {
+        "id": "test-create-and-commit",
+        "description": "创建 version.txt 文件，内容为当前日期，并 commit",
+        "status": "pending",
+        "expected_files": ["version.txt"],
+        "validation": "git log --oneline | head -1 | grep version"
+      }
+    ],
+    "level3_multi_files": [
+      {
+        "id": "test-create-module",
+        "description": "创建 Python 模块：math_utils.py (add 和 multiply 函数) 和 test_math.py (测试用例)",
+        "status": "pending",
+        "expected_files": ["math_utils.py", "test_math.py"],
+        "validation": "python test_math.py"
+      }
+    ],
+    "level4_with_deps": [
+      {
+        "id": "test-sequence-1",
+        "description": "创建 step1.txt，内容为 'Step 1 done'",
+        "status": "pending",
+        "depends_on": [],
+        "expected_files": ["step1.txt"]
+      },
+      {
+        "id": "test-sequence-2",
+        "description": "读取 step1.txt，创建 step2.txt，内容为 'Step 1 done -> Step 2 done'",
+        "status": "pending",
+        "depends_on": ["test-sequence-1"],
+        "expected_files": ["step2.txt"]
+      }
+    ]
+  }
+}

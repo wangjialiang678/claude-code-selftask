@@ -1,0 +1,592 @@
+// Voice Recorder for ASR Integration
+class VoiceRecorder {
+    constructor(app) {
+        this.app = app;
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.startTime = null;
+        this.timerInterval = null;
+        this.isRecording = false;
+        this.isProcessing = false;
+
+        // 使用 FastAPI 代理端点，避免 CORS 问题
+        this.ASR_UPLOAD_URL = '/api/asr/upload';
+        this.ASR_TASK_URL = '/api/asr/tasks';
+        this.MAX_DURATION = 60000;
+        this.MIN_DURATION = 1000;
+        this.POLL_INTERVAL = 500;
+        this.POLL_TIMEOUT = 30000;
+    }
+
+    async startRecording() {
+        if (this.isRecording || this.isProcessing) return;
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            this.audioChunks = [];
+            this.mediaRecorder = new MediaRecorder(stream);
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+
+            this.mediaRecorder.onstop = async () => {
+                const duration = Date.now() - this.startTime;
+
+                stream.getTracks().forEach(track => track.stop());
+
+                if (duration < this.MIN_DURATION) {
+                    this.app.log('录音时间过短，请重试', 'warning');
+                    this.updateUI('idle');
+                    return;
+                }
+
+                const audioBlob = new Blob(this.audioChunks, { type: this.mediaRecorder.mimeType });
+                await this.uploadAndTranscribe(audioBlob);
+            };
+
+            this.mediaRecorder.start();
+            this.isRecording = true;
+            this.startTime = Date.now();
+            this.updateUI('recording');
+            this.startTimer();
+
+            this.app.log('开始录音...', 'info');
+
+            setTimeout(() => {
+                if (this.isRecording) {
+                    this.app.log('已达最大录音时长 (60秒)，自动停止', 'warning');
+                    this.stopRecording();
+                }
+            }, this.MAX_DURATION);
+
+        } catch (error) {
+            console.error('录音失败:', error);
+            if (error.name === 'NotAllowedError') {
+                this.app.log('麦克风权限被拒绝，请允许访问麦克风', 'error');
+                alert('需要麦克风权限才能使用语音输入功能');
+            } else {
+                this.app.log('录音失败: ' + error.message, 'error');
+            }
+            this.updateUI('idle');
+        }
+    }
+
+    stopRecording() {
+        if (!this.isRecording || !this.mediaRecorder) return;
+
+        this.isRecording = false;
+        this.stopTimer();
+        this.mediaRecorder.stop();
+    }
+
+    startTimer() {
+        const timerEl = document.querySelector('.voice-timer');
+        if (!timerEl) return;
+
+        this.timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+            timerEl.textContent = `${elapsed}s`;
+        }, 100);
+    }
+
+    stopTimer() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    }
+
+    async uploadAndTranscribe(audioBlob) {
+        this.isProcessing = true;
+        this.updateUI('processing');
+        this.app.log('正在上传音频文件...', 'info');
+
+        try {
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'recording.webm');
+
+            const uploadResponse = await fetch(this.ASR_UPLOAD_URL, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error(`上传失败: ${uploadResponse.status} ${uploadResponse.statusText}`);
+            }
+
+            const uploadData = await uploadResponse.json();
+
+            if (!uploadData.task_id) {
+                throw new Error('未返回任务 ID');
+            }
+
+            this.app.log(`上传成功，任务ID: ${uploadData.task_id}`, 'success');
+            this.app.log('正在识别语音...', 'info');
+
+            const transcript = await this.pollResult(uploadData.task_id);
+
+            if (transcript) {
+                this.app.log('识别成功: ' + transcript, 'success');
+                const textarea = document.getElementById('task-description');
+                if (textarea) {
+                    textarea.value = transcript;
+                    textarea.focus();
+                }
+            }
+
+        } catch (error) {
+            console.error('ASR 处理失败:', error);
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+
+            // 显示详细错误信息
+            let errorMsg = '语音识别失败: ';
+            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+                errorMsg = '无法连接 ASR 服务器 (localhost:18080)';
+            } else if (error.message.includes('CORS')) {
+                errorMsg = 'CORS 错误，请检查 ASR 服务器 CORS 配置';
+            } else if (error.message.includes('未返回任务 ID')) {
+                errorMsg = 'ASR 服务器响应格式错误: ' + error.message;
+            } else {
+                errorMsg += error.message;
+            }
+
+            this.app.log(errorMsg, 'error');
+            alert(errorMsg); // 弹窗显示错误，确保用户能看到
+        } finally {
+            this.isProcessing = false;
+            this.updateUI('idle');
+        }
+    }
+
+    async pollResult(taskId) {
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < this.POLL_TIMEOUT) {
+            try {
+                const response = await fetch(`${this.ASR_TASK_URL}/${taskId}`);
+
+                if (!response.ok) {
+                    throw new Error(`轮询失败: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'completed' || data.status === 'done') {
+                    return data.transcript || data.text || data.result;
+                }
+
+                if (data.status === 'failed' || data.status === 'error') {
+                    throw new Error(data.error || '识别失败');
+                }
+
+                await new Promise(resolve => setTimeout(resolve, this.POLL_INTERVAL));
+
+            } catch (error) {
+                if (Date.now() - startTime >= this.POLL_TIMEOUT) {
+                    throw new Error('识别超时，请重试');
+                }
+                throw error;
+            }
+        }
+
+        throw new Error('识别超时，请重试');
+    }
+
+    updateUI(state) {
+        const btn = document.getElementById('voice-btn');
+        const icon = document.querySelector('.voice-icon');
+        const timer = document.querySelector('.voice-timer');
+
+        if (!btn || !icon || !timer) return;
+
+        btn.classList.remove('recording', 'processing');
+
+        switch (state) {
+            case 'recording':
+                btn.classList.add('recording');
+                icon.textContent = '🔴';
+                timer.style.display = 'block';
+                btn.title = '停止录音';
+                break;
+
+            case 'processing':
+                btn.classList.add('processing');
+                icon.textContent = '⏳';
+                timer.style.display = 'none';
+                btn.title = '处理中...';
+                break;
+
+            case 'idle':
+            default:
+                icon.textContent = '🎤';
+                timer.style.display = 'none';
+                timer.textContent = '0s';
+                btn.title = '语音输入';
+                break;
+        }
+    }
+}
+
+// Claude Code Worker Manager - Frontend App
+class WorkerManagerApp {
+    constructor() {
+        this.ws = null;
+        this.tasks = [];
+        this.currentFilter = 'all';
+        this.reconnectTimeout = null;
+        this.voiceRecorder = null;
+
+        this.init();
+    }
+
+    init() {
+        // 初始化语音录制器 - 使用新的实时流式识别
+        if (typeof RealtimeVoiceRecorder !== 'undefined') {
+            this.voiceRecorder = new RealtimeVoiceRecorder(this);
+            this.log('✓ 实时流式语音识别已启用', 'success');
+        } else {
+            this.voiceRecorder = new VoiceRecorder(this);
+            this.log('使用录音文件识别模式', 'info');
+        }
+
+        // 初始化 WebSocket
+        this.connectWebSocket();
+
+        // 加载初始数据
+        this.loadStatus();
+        this.loadTasks();
+
+        // 绑定事件
+        this.bindEvents();
+
+        // 定期刷新状态和任务列表
+        setInterval(() => this.loadStatus(), 10000);
+        setInterval(() => this.loadTasks(), 5000); // 每5秒刷新任务列表
+    }
+
+    connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+        this.log('正在连接 WebSocket...', 'info');
+        this.updateConnectionStatus('connecting');
+
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            this.log('WebSocket 已连接', 'success');
+            this.updateConnectionStatus('connected');
+
+            // 清除重连定时器
+            if (this.reconnectTimeout) {
+                clearTimeout(this.reconnectTimeout);
+                this.reconnectTimeout = null;
+            }
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleWebSocketMessage(data);
+            } catch (error) {
+                console.error('解析 WebSocket 消息失败:', error);
+            }
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket 错误:', error);
+            this.log('WebSocket 连接错误', 'error');
+        };
+
+        this.ws.onclose = () => {
+            this.log('WebSocket 已断开，5 秒后重连...', 'warning');
+            this.updateConnectionStatus('disconnected');
+
+            // 5 秒后重连
+            this.reconnectTimeout = setTimeout(() => {
+                this.connectWebSocket();
+            }, 5000);
+        };
+    }
+
+    handleWebSocketMessage(data) {
+        switch (data.type) {
+            case 'connected':
+                this.log(data.message, 'success');
+                break;
+
+            case 'task_created':
+                this.log(`新任务: ${data.task.description}`, 'info');
+                this.loadTasks();
+                break;
+
+            case 'task_updated':
+                this.log(`任务更新: ${data.task_id} -> ${data.status}`, 'info');
+                this.loadTasks();
+                break;
+
+            case 'task_deleted':
+                this.log(`任务删除: ${data.task_id}`, 'warning');
+                this.loadTasks();
+                break;
+
+            case 'log':
+                this.log(data.message, data.level || 'info');
+                break;
+
+            default:
+                console.log('未知消息类型:', data);
+        }
+    }
+
+    updateConnectionStatus(status) {
+        const statusEl = document.getElementById('ws-status');
+        if (!statusEl) return;
+
+        switch (status) {
+            case 'connected':
+                statusEl.textContent = '已连接';
+                statusEl.className = 'badge badge-success';
+                break;
+            case 'connecting':
+                statusEl.textContent = '连接中...';
+                statusEl.className = 'badge badge-warning';
+                break;
+            case 'disconnected':
+                statusEl.textContent = '已断开';
+                statusEl.className = 'badge badge-error';
+                break;
+        }
+    }
+
+    async loadStatus() {
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+
+            // 更新 UI
+            document.getElementById('worker-count').textContent =
+                `${data.workers} / ${data.max_workers}`;
+            document.getElementById('pending-count').textContent =
+                data.tasks.pending || 0;
+        } catch (error) {
+            console.error('加载状态失败:', error);
+        }
+    }
+
+    async loadTasks() {
+        try {
+            const response = await fetch('/api/tasks');
+            const data = await response.json();
+            this.tasks = data.tasks || [];
+            this.renderTasks();
+        } catch (error) {
+            console.error('加载任务失败:', error);
+            this.log('加载任务失败', 'error');
+        }
+    }
+
+    renderTasks() {
+        const taskList = document.getElementById('task-list');
+        if (!taskList) return;
+
+        // 过滤任务
+        let filteredTasks = this.tasks;
+        if (this.currentFilter !== 'all') {
+            filteredTasks = this.tasks.filter(t => t.status === this.currentFilter);
+        }
+
+        // 按创建时间倒序
+        filteredTasks.sort((a, b) =>
+            new Date(b.created_at) - new Date(a.created_at)
+        );
+
+        if (filteredTasks.length === 0) {
+            taskList.innerHTML = '<div class="empty-state">暂无任务</div>';
+            return;
+        }
+
+        taskList.innerHTML = filteredTasks.map(task => `
+            <div class="task-item" data-status="${task.status}">
+                <div class="task-info">
+                    <div class="task-id">${task.id}</div>
+                    <div class="task-description">${this.escapeHtml(task.description)}</div>
+                    <div class="task-meta">
+                        创建于: ${this.formatTime(task.created_at)}
+                        ${task.worker_id ? ` | Worker: ${task.worker_id}` : ''}
+                        ${task.completed_at ? ` | 完成于: ${this.formatTime(task.completed_at)}` : ''}
+                    </div>
+                </div>
+                <div class="task-actions">
+                    <span class="task-status status-${task.status}">${this.getStatusText(task.status)}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async addTask(description) {
+        try {
+            const response = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ description })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.log(`任务已添加: ${description}`, 'success');
+                this.loadTasks();
+                this.loadStatus();
+                return true;
+            } else {
+                this.log('添加任务失败', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('添加任务失败:', error);
+            this.log('添加任务失败: ' + error.message, 'error');
+            return false;
+        }
+    }
+
+    log(message, level = 'info') {
+        const logContainer = document.getElementById('log-container');
+        if (!logContainer) return;
+
+        const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${level}`;
+        logEntry.innerHTML = `<span class="log-time">[${time}]</span>${this.escapeHtml(message)}`;
+
+        logContainer.appendChild(logEntry);
+
+        // 自动滚动到底部
+        logContainer.scrollTop = logContainer.scrollHeight;
+
+        // 限制日志数量（最多 500 条）
+        const entries = logContainer.querySelectorAll('.log-entry');
+        if (entries.length > 500) {
+            entries[0].remove();
+        }
+    }
+
+    clearLogs() {
+        const logContainer = document.getElementById('log-container');
+        if (logContainer) {
+            logContainer.innerHTML = '';
+            this.log('日志已清空', 'info');
+        }
+    }
+
+    bindEvents() {
+        // 添加任务表单
+        const addTaskForm = document.getElementById('add-task-form');
+        if (addTaskForm) {
+            addTaskForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const textarea = document.getElementById('task-description');
+                const description = textarea.value.trim();
+
+                if (description) {
+                    const success = await this.addTask(description);
+                    if (success) {
+                        textarea.value = '';
+                    }
+                }
+            });
+        }
+
+        // 任务过滤器
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // 更新活动状态
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                // 更新过滤器
+                this.currentFilter = btn.dataset.filter;
+                this.renderTasks();
+            });
+        });
+
+        // 清空日志按钮
+        const clearLogsBtn = document.getElementById('clear-logs');
+        if (clearLogsBtn) {
+            clearLogsBtn.addEventListener('click', () => {
+                this.clearLogs();
+            });
+        }
+
+        // 语音输入按钮
+        const voiceBtn = document.getElementById('voice-btn');
+        if (voiceBtn && this.voiceRecorder) {
+            voiceBtn.addEventListener('click', () => {
+                if (this.voiceRecorder.isRecording) {
+                    this.voiceRecorder.stopRecording();
+                } else if (!this.voiceRecorder.isProcessing) {
+                    this.voiceRecorder.startRecording();
+                }
+            });
+        }
+    }
+
+    getStatusText(status) {
+        const statusMap = {
+            'pending': '待处理',
+            'working': '进行中',
+            'done': '已完成',
+            'failed': '失败'
+        };
+        return statusMap[status] || status;
+    }
+
+    formatTime(isoString) {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// 页面加载完成后初始化应用
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new WorkerManagerApp();
+});
+
+// 注册 Service Worker（PWA 支持）
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/service-worker.js')
+            .then(registration => {
+                console.log('Service Worker 注册成功:', registration);
+            })
+            .catch(error => {
+                console.log('Service Worker 注册失败:', error);
+            });
+    });
+}

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#00d4aa">
+    <title>Claude Code Worker Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="manifest" href="/static/manifest.json">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header>
+            <h1>🚀 Claude Code Worker Manager</h1>
+            <div class="connection-status">
+                <span id="ws-status" class="badge badge-warning">连接中...</span>
+            </div>
+        </header>
+
+        <!-- 系统状态 -->
+        <section class="status-section">
+            <h2>系统状态</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Claude Code 版本</div>
+                    <div class="info-value">2.1.50</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Worktree 支持</div>
+                    <div class="info-value">
+                        <span class="badge badge-success">✓ 原生支持</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">运行中 Worker</div>
+                    <div class="info-value" id="worker-count">0 / 5</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">待处理任务</div>
+                    <div class="info-value" id="pending-count">0</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 添加任务 -->
+        <section class="task-form-section">
+            <h2>添加新任务</h2>
+            <form id="add-task-form">
+                <div class="form-group voice-input-container">
+                    <textarea
+                        id="task-description"
+                        placeholder="输入任务描述，例如：创建一个 hello.py 文件，内容为 print('Hello World')"
+                        rows="3"
+                        required
+                    ></textarea>
+                    <button type="button" id="voice-btn" class="voice-btn" title="语音输入">
+                        <span class="voice-icon">🎤</span>
+                        <span class="voice-timer" style="display: none;">0s</span>
+                    </button>
+                </div>
+                <button type="submit" class="btn btn-primary">添加任务</button>
+            </form>
+        </section>
+
+        <!-- 任务列表 -->
+        <section class="tasks-section">
+            <h2>任务队列</h2>
+            <div class="task-filters">
+                <button class="filter-btn active" data-filter="all">全部</button>
+                <button class="filter-btn" data-filter="pending">待处理</button>
+                <button class="filter-btn" data-filter="working">进行中</button>
+                <button class="filter-btn" data-filter="done">已完成</button>
+            </div>
+            <div id="task-list" class="task-list">
+                <div class="empty-state">暂无任务</div>
+            </div>
+        </section>
+
+        <!-- 实时日志 -->
+        <section class="logs-section">
+            <div class="logs-header">
+                <h2>实时日志</h2>
+                <button id="clear-logs" class="btn btn-small">清空</button>
+            </div>
+            <div id="log-container" class="log-container">
+                <div class="log-entry log-info">等待连接...</div>
+            </div>
+        </section>
+
+        <!-- 底部 -->
+        <footer>
+            <p>基于胡渊鸣《我给 10 个 Claude Code 打工》复刻</p>
+            <p>Powered by FastAPI + Claude Code 2.1.50 原生 Worktree</p>
+        </footer>
+    </div>
+
+    <script src="/static/voice-realtime.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

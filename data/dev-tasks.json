@@ -1,10 +1,76 @@
 {
   "tasks": [
     {
-      "id": "task-hello",
-      "description": "创建 hello.txt 文件，内容为 'Hello from Worker 1'",
-      "status": "pending",
-      "created_at": "2026-02-23T00:00:00Z"
+      "id": "parallel-test-1",
+      "description": "创建文件 worker-1.txt，内容为 'Worker 1 completed at 2026-02-23'，然后 git add worker-1.txt && git commit -m 'Test: parallel-test-1'",
+      "status": "done",
+      "created_at": "2026-02-23T09:40:00Z",
+      "worker_id": "worker-1",
+      "started_at": "2026-02-23T01:30:35.512863Z",
+      "completed_at": "2026-02-23T01:31:30.384424Z"
+    },
+    {
+      "id": "parallel-test-2",
+      "description": "创建文件 worker-2.txt，内容为 'Worker 2 completed at 2026-02-23'，然后 git add worker-2.txt && git commit -m 'Test: parallel-test-2'",
+      "status": "done",
+      "created_at": "2026-02-23T09:40:00Z",
+      "worker_id": "worker-2",
+      "started_at": "2026-02-23T01:30:36.276874Z",
+      "completed_at": "2026-02-23T01:31:20.423661Z"
+    },
+    {
+      "id": "parallel-test-3",
+      "description": "创建文件 worker-3.txt，内容为 'Worker 3 completed at 2026-02-23'，然后 git add worker-3.txt && git commit -m 'Test: parallel-test-3'",
+      "status": "done",
+      "created_at": "2026-02-23T09:40:00Z",
+      "worker_id": "worker-3",
+      "started_at": "2026-02-23T01:30:36.362620Z",
+      "completed_at": "2026-02-23T01:31:18.547790Z"
+    },
+    {
+      "id": "parallel-test-4",
+      "description": "创建文件 worker-4.txt，内容为 'Worker 4 completed at 2026-02-23'，然后 git add worker-4.txt && git commit -m 'Test: parallel-test-4'",
+      "status": "done",
+      "created_at": "2026-02-23T09:40:00Z",
+      "worker_id": "worker-3",
+      "started_at": "2026-02-23T01:31:20.561003Z",
+      "completed_at": "2026-02-23T01:32:03.827469Z"
+    },
+    {
+      "id": "parallel-test-5",
+      "description": "创建文件 worker-5.txt，内容为 'Worker 5 completed at 2026-02-23'，然后 git add worker-5.txt && git commit -m 'Test: parallel-test-5'",
+      "status": "done",
+      "created_at": "2026-02-23T09:40:00Z",
+      "worker_id": "worker-2",
+      "started_at": "2026-02-23T01:31:22.503767Z",
+      "completed_at": "2026-02-23T01:32:03.194670Z"
+    },
+    {
+      "id": "demo-task-115240",
+      "description": "创建文件 demo-from-python.txt，内容为 'Added via Python script'",
+      "status": "done",
+      "created_at": "2026-02-23T03:52:40.322370Z",
+      "worker_id": "worker-test",
+      "started_at": "2026-02-23T06:42:51.387846Z",
+      "completed_at": "2026-02-23T06:43:43.469978Z"
+    },
+    {
+      "id": "task-20260223-121625-7e47b931",
+      "description": "测试任务：创建文件 web-test.txt，内容为 Hello from web",
+      "status": "done",
+      "created_at": "2026-02-23T04:16:25.767947Z",
+      "worker_id": "worker-test",
+      "started_at": "2026-02-23T06:43:45.473598Z",
+      "completed_at": "2026-02-23T06:44:20.741656Z"
+    },
+    {
+      "id": "task-20260223-143834-320e61cc",
+      "description": "现在在project 目录下，worktree-worker开头的这几个目录都放在了错误的地方，应该是claude-code-selftask 项目下面的测试目录。帮我重新整理一下，另外整理的时候确认这些目录没有依赖，如果有依赖这几个目录的，你也帮我一起更新一下",
+      "status": "done",
+      "created_at": "2026-02-23T06:38:34.048203Z",
+      "worker_id": "worker-test",
+      "started_at": "2026-02-23T06:44:22.865677Z",
+      "completed_at": "2026-02-23T06:49:16.814851Z"
     }
   ]
 }
